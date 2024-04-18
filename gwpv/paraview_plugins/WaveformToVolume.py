@@ -132,9 +132,6 @@ class WaveformToVolume(VTKPythonAlgorithmBase):
         #     for i in range(waveform_data_info.Length(modes_arrays_key)):
         #         self.modes_selection.AddArray(waveform_data_info.Get(
         #             modes_arrays_key, i))
-        for l in range(2, 5 + 1):
-            for m in range(0, l + 1):
-                self.modes_selection.AddArray(get_mode_name(l, m))
         self.modes_selection.AddObserver(
             "ModifiedEvent", das_util.create_modified_callback(self)
         )
@@ -144,6 +141,11 @@ class WaveformToVolume(VTKPythonAlgorithmBase):
         self.polarizations_selection.AddObserver(
             "ModifiedEvent", das_util.create_modified_callback(self)
         )
+    
+    def initModes(self):
+        for l in range(2, self.ell_max+1):
+            for m in range(0, self.ell_max+1):
+                self.modes_selection.AddArray(get_mode_name(l, m))
 
     def FillInputPortInformation(self, port, info):
         # When using multiple inputs we (may) have to set their data types here
@@ -196,6 +198,7 @@ class WaveformToVolume(VTKPythonAlgorithmBase):
     @smproperty.intvector(name="EllMax", default_values=2)
     def SetEllMax(self, value):
         self.ell_max = value
+        self.initModes();
         self.Modified()
 
     @smproperty.doublevector(name="SpinWeight", default_values=-2)
@@ -349,7 +352,7 @@ class WaveformToVolume(VTKPythonAlgorithmBase):
         # Compute strain in the volume from the input waveform data
         skip_timesteps = self.keep_every_n_timestep
         waveform_timesteps = waveform_data.RowData["Time"][::skip_timesteps]
-        strain = np.zeros(len(r), dtype=np.complex)
+        strain = np.zeros(len(r), dtype=complex)
         # Optimization for when the waveform is sampled uniformly
         # TODO: Cache this
         dt = np.diff(waveform_timesteps)
@@ -401,7 +404,7 @@ class WaveformToVolume(VTKPythonAlgorithmBase):
         for l in range(abs(spin_weight), ell_max + 1):
             for abs_m in range(0, l + 1):
                 mode_name = get_mode_name(l, abs_m)
-                strain_mode = np.zeros(len(r), dtype=np.complex)
+                strain_mode = np.zeros(len(r), dtype=complex)
                 if not self.modes_selection.ArrayIsEnabled(mode_name):
                     continue
                 for sign_m in (-1, 1):

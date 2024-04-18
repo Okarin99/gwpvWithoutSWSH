@@ -129,6 +129,7 @@ def render_frames(
         )
         if "Modes" in waveform_to_volume_config["Object"]:
             volume_data.Modes = waveform_to_volume_config["Object"]["Modes"]
+
         if "Polarizations" in waveform_to_volume_config["Object"]:
             volume_data.Polarizations = waveform_to_volume_config["Object"][
                 "Polarizations"
@@ -141,8 +142,14 @@ def render_frames(
         volume_data.TimestepValues[-1],
     )
     logger.debug(f"Full available data time range: {time_range_in_M} (in M)")
+    interact = False
     if "FreezeTime" in scene["Animation"]:
         frozen_time = scene["Animation"]["FreezeTime"]
+        if not(isinstance(frozen_time, float)):
+            if "Interact" in frozen_time:
+                interact = frozen_time["Interact"]
+            frozen_time = frozen_time["Time"]
+
         logger.info(f"Freezing time at {frozen_time}.")
         view.ViewTime = frozen_time
         animation = None
@@ -268,6 +275,13 @@ def render_frames(
             volume_data, **scene["TimeAnnotation"]
         )
         pv.Show(time_annotation, view, **scene["TimeAnnotationRepresentation"])
+
+    if "Annotations" in scene:
+        for annotation in scene["Annotations"]:
+            text = pv.Text()
+            text.Text = annotation["Text"]
+            del annotation["Text"]
+            pv.Show(text, view, **annotation)
 
     # Add spheres
     if "Spheres" in scene:
@@ -459,9 +473,74 @@ def render_frames(
             colored_field = tf_config["Field"]
             transfer_fctn = pv.GetColorTransferFunction(colored_field)
             opacity_fctn = pv.GetOpacityTransferFunction(colored_field)
+            scalarBarTransfer_fctn = pv.GetColorTransferFunction(colored_field + "_ScalarBar")
+
             tf.configure_transfer_function(
-                transfer_fctn, opacity_fctn, tf_config["TransferFunction"]
+                transfer_fctn, opacity_fctn, scalarBarTransfer_fctn, tf_config["TransferFunction"]
             )
+
+            if "ScalarBar" in tf_config:
+                scalar_bar_config = tf_config["ScalarBar"]
+                scalar_bar = pv.GetScalarBar(scalarBarTransfer_fctn, view)
+                scalar_bar.Visibility = True
+                scalar_bar.ComponentTitle = ""
+
+                if isinstance(scalar_bar_config, str):
+                    scalar_bar.Title = scalar_bar_config;
+                else:
+                    title_config = scalar_bar_config["Title"]
+                    if isinstance(title_config, str):
+                        scalar_bar.Title = title_config
+                    else:
+                        if "Name" in title_config:
+                            scalar_bar.Title = title_config["Name"]
+                        if "Bold" in title_config:
+                            scalar_bar.TitleBold = title_config["Bold"]
+                        if "Color" in title_config:
+                            scalar_bar.TitleColor = title_config["Color"]
+                        if "FontFamily" in title_config:
+                            scalar_bar.TitleFontFamily = title_config["FontFamily"]
+                        if "FontSize" in title_config:
+                            scalar_bar.TitleFontSize = title_config["FontSize"]
+                        if "Italic" in title_config:
+                            scalar_bar.TitleItalic = title_config["Italic"]
+                        if "Opacity" in title_config:
+                            scalar_bar.TitleOpacity = title_config["Opacity"] 
+
+
+                    if "Position" in scalar_bar_config:
+                        scalar_bar.Position = scalar_bar_config["Position"]
+                        scalar_bar.WindowLocation = "Any Location"
+                    elif "WindowLocation" in scalar_bar_config:
+                        scalar_bar.WindowLocation = scalar_bar_config["WindowLocation"]
+
+                    if "Orientation" in scalar_bar_config:
+                        scalar_bar.AutoOrient = False
+                        scalar_bar.Orientation = scalar_bar_config["Orientation"]
+                    else:
+                        scalar_bar.AutoOrient = True
+
+                    if "UseCategories" in scalar_bar_config and scalar_bar_config["UseCategories"]:
+                        scalarBarTransfer_fctn.InterpretValuesAsCategories = 1
+                    else:
+                        scalarBarTransfer_fctn.InterpretValuesAsCategories = 0
+                        scalarBarTransfer_fctn.Annotations = None
+                    
+                    if "Label" in scalar_bar_config:
+                        label_config = scalar_bar_config["Label"]
+                        if "Bold" in label_config:
+                            scalar_bar.LabelBold = label_config["Bold"]
+                        if "Color" in label_config:
+                            scalar_bar.LabelColor = label_config["Color"]
+                        if "FontFamily" in label_config:
+                            scalar_bar.LabelFontFamily = label_config["FontFamily"]
+                        if "FontSize" in label_config:
+                            scalar_bar.LabelFontSize = label_config["FontSize"]
+                        if "Italic" in label_config:
+                            scalar_bar.LabelItalic = label_config["Italic"]
+                        if "Opacity" in label_config:
+                            scalar_bar.LabelOpacity = label_config["Opacity"] 
+            
 
     # Save state file before configuring camera keyframes.
     # TODO: Make camera keyframes work with statefile
@@ -528,6 +607,13 @@ def end_cue(self): pass
     if animation is None:
         pv.Render()
         pv.SaveScreenshot(os.path.join(frames_dir, "frame.png"))
+        if interact:
+            pv.Interact()
+            cam = pv.GetActiveCamera()
+            print("Camera settings after interact")
+            print("Position:", cam.GetPosition())
+            print("Focal point:", cam.GetFocalPoint())
+            print("View up:", cam.GetViewUp())
         yield dict(completed=1)
     else:
         # Iterate over frames manually to support filling in missing frames.
