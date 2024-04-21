@@ -113,38 +113,28 @@ def configure_peaks_transfer_function(transfer_fctn, opacity_fctn, scalarBarTran
     tf_decay = list(np.diff(peaks) / 2)
     tf_decay.append(tf_decay[-1])
     opacity_scale = (opacity_last_peak - opacity_first_peak) / (num_peaks - 1)
+    opacities = [opacity_first_peak + opacity_scale * i for i in range(0, len(peaks))]
 
     if "AddNegatives" in tf_config and tf_config["AddNegatives"]:
-        transfer_fctn.RescaleTransferFunction(-last_peak, last_peak)
-        scalarBarTransfer_fctn.RescaleTransferFunction(-last_peak, last_peak)
-        set_opacity_function_points(
-            opacity_fctn,
+        peaks = [*[-d for d in peaks[::-1]], *peaks]
+        tf_decay = [*[-d for d in tf_decay[::-1]], *tf_decay]
+        opacities = [*[d for d in opacities[::-1]], *opacities]
+
+    transfer_fctn.RescaleTransferFunction(peaks[0], peaks[-1])
+    scalarBarTransfer_fctn.RescaleTransferFunction(peaks[0], peaks[-1])
+    set_opacity_function_points(
+        opacity_fctn,
+        [
             [
-                [
-                    (peak - peak_decay / 100.0, 0.0, 0.5, 0.0),
-                    (peak, opacity_first_peak + opacity_scale * i, 0.5, 0.0),
-                    (peak + peak_decay, 0.0, 0.5, 0.0),
-                    (-peak + peak_decay / 100.0, 0.0, 0.5, 0.0),
-                    (-peak, opacity_first_peak + opacity_scale * i, 0.5, 0.0),
-                    (-peak - peak_decay, 0.0, 0.5, 0.0),
-                ]
-                for i, (peak, peak_decay) in enumerate(zip(peaks, tf_decay))
-            ],
-        )
-    else:
-        transfer_fctn.RescaleTransferFunction(first_peak, last_peak)
-        scalarBarTransfer_fctn.RescaleTransferFunction(first_peak, last_peak)
-        set_opacity_function_points(
-            opacity_fctn,
-            [
-                [
-                    (peak - peak_decay / 100.0, 0.0, 0.5, 0.0),
-                    (peak, opacity_first_peak + opacity_scale * i, 0.5, 0.0),
-                    (peak + peak_decay, 0.0, 0.5, 0.0),
-                ]
-                for i, (peak, peak_decay) in enumerate(zip(peaks, tf_decay))
-            ],
-        )
+                (peak - peak_decay / 100.0, 0.0, 0.5, 0.0),
+                (peak, opacity, 0.5, 0.0),
+                (peak + peak_decay, 0.0, 0.5, 0.0),
+            ]
+            for peak, peak_decay, opacity in zip(peaks, tf_decay, opacities)
+        ],
+    )
+
+    set_categories(scalarBarTransfer_fctn, scalarBarTransfer_fctn.RGBPoints, peaks)
 
 def configure_custom_peaks_transfer_function(transfer_fctn, opacity_fctn, scalarBarTransfer_fctn, tf_config):
     apply_colormap(transfer_fctn, tf_config)
@@ -159,8 +149,8 @@ def configure_custom_peaks_transfer_function(transfer_fctn, opacity_fctn, scalar
         inverse_peaks = copy.deepcopy(peaks[::-1])
         for i in range(len(inverse_peaks)):
             inverse_peaks[i]["Position"] *= -1
-        peaks = inverse_peaks + peaks
-        tf_decay = [-d for d in tf_decay[::-1]] + tf_decay
+        peaks = [*inverse_peaks, *peaks]
+        tf_decay = [*[-d for d in tf_decay[::-1]], *tf_decay]
 
     transfer_fctn.RescaleTransferFunction(peaks[0]["Position"], peaks[-1]["Position"])
     scalarBarTransfer_fctn.RescaleTransferFunction(peaks[0]["Position"], peaks[-1]["Position"])
