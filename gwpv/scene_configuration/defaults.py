@@ -1,7 +1,7 @@
 import logging
 
-import h5py
 import numpy as np
+import sxs
 
 from . import color, parse_as
 
@@ -50,13 +50,10 @@ def apply_defaults(scene):
         and "Size" in scene["WaveformToVolume"]
         and "RadialScale" in scene["WaveformToVolume"]
     ):
-        waveform_file_and_subfile = parse_as.file_and_subfile(
-            scene["Datasources"]["Waveform"]
+        waveform_data = sxs.load(
+            **parse_as.sxs_location(scene["Datasources"]["Waveform"])
         )
-        with h5py.File(waveform_file_and_subfile[0], "r") as waveform_file:
-            waveform_data = waveform_file[waveform_file_and_subfile[1]]
-            mode_data = waveform_data["Y_l2_m2.dat"]
-            t0, t1 = mode_data[0, 0], mode_data[-1, 0]
+        t0, t1 = waveform_data.time[[0, -1]]
         domain_radius = (
             scene["WaveformToVolume"]["Size"]
             * scene["WaveformToVolume"]["RadialScale"]
@@ -112,15 +109,11 @@ def apply_defaults(scene):
         if "NumPeaks" not in peaks_config:
             peaks_config["NumPeaks"] = 10
         if "FirstPeak" not in peaks_config and "LastPeak" not in peaks_config:
-            waveform_file_and_subfile = parse_as.file_and_subfile(
-                scene["Datasources"]["Waveform"]
+            waveform_data = sxs.load(
+                **parse_as.sxs_location(scene["Datasources"]["Waveform"])
             )
-            with h5py.File(waveform_file_and_subfile[0], "r") as waveform_file:
-                waveform_data = waveform_file[waveform_file_and_subfile[1]]
-                mode_data = waveform_data["Y_l2_m2.dat"]
-                mode_max = np.max(
-                    np.abs(mode_data[:, 1] + 1j * mode_data[:, 2])
-                )
+            mode_data = waveform_data[:, waveform_data.index(2, 2)]
+            mode_max = np.max(np.abs(mode_data))
             pos_first_peak, pos_last_peak = 0.01 * mode_max, 0.2 * mode_max
             peaks_config["FirstPeak"] = {
                 "Position": pos_first_peak,

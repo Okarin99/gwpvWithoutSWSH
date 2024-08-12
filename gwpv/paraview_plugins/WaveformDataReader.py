@@ -4,12 +4,15 @@ import logging
 import time
 
 import h5py
+import numpy as np
+import sxs
 from paraview.util.vtkAlgorithm import smdomain, smhint, smproperty, smproxy
 from paraview.vtk.util import keys as vtkkeys
 from paraview.vtk.util import numpy_support as vtknp
 from vtkmodules.numpy_interface import dataset_adapter as dsa
 from vtkmodules.util.vtkAlgorithm import VTKPythonAlgorithmBase
 from vtkmodules.vtkCommonDataModel import vtkTable
+from gwpv.plugin_util.all_subfiles import all_subfiles
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,7 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
         )
         self._filename = None
         self._subfile = None
+        self.waveform_data = None
         self.mode_names = []
 
     @smproperty.stringvector(name="FileName")
@@ -65,11 +69,25 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
         self._filename = value
         self.Modified()
 
-    @smproperty.stringvector(
-        name="Subfile", default_values=["Extrapolated_N2.dir"]
+    @smproperty.stringvector(name="SubfileList", information_only="1")
+    def GetSubfiles(self):
+        with h5py.File(self._filename, "r") as open_h5file:
+            return list(all_subfiles(open_h5file))
+
+    @smproperty.stringvector(name="Subfile", number_of_elements="1")
+    @smdomain.xml(
+        """<StringListDomain name="list">
+                <RequiredProperties>
+                    <Property name="SubfileList" function="SubfileList"/>
+                </RequiredProperties>
+            </StringListDomain>
+        """
     )
     def SetSubfile(self, value):
-        self._subfile = value
+        if value == "None":
+            self._subfile = None
+        else:
+            self._subfile = value
         self.Modified()
 
     def RequestInformation(self, request, inInfo, outInfo):
@@ -79,19 +97,11 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
         # propagates down the pipeline. This allows subsequent filters to select
         # a subset of modes to display, for example.
         if self._filename is not None and self._subfile is not None:
-            with h5py.File(self._filename, "r") as f:
-                self.mode_names = list(
-                    map(
-                        lambda dataset_name: dataset_name.replace(".dat", ""),
-                        filter(
-                            lambda dataset_name: dataset_name.startswith("Y_"),
-                            f[self._subfile].keys(),
-                        ),
-                    )
-                )
+            self.waveform_data = sxs.load(self._filename, group=self._subfile)
+            self.mode_names = [f"Y_l{l}_m{m}" for l, m in self.waveform_data.LM]
             if len(self.mode_names) == 0:
                 logger.warning(
-                    "No waveform mode datasets (prefixed 'Y_') found in file"
+                    "No waveform mode datasets found in file"
                     f" '{self._filename}:{self._subfile}'."
                 )
             logger.debug("Set MODE_ARRAYS: {}".format(self.mode_names))
@@ -118,20 +128,22 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
             and self._subfile is not None
             and len(self.mode_names) > 0
         ):
-            with h5py.File(self._filename, "r") as f:
-                strain = f[self._subfile]
-                t = strain["Y_l2_m2.dat"][:, 0]
-                col_time = vtknp.numpy_to_vtk(t, deep=False)
-                col_time.SetName("Time")
-                output.AddColumn(col_time)
-
-                for mode_name in self.mode_names:
-                    logger.debug(f"Reading mode '{mode_name}'...")
-                    col_mode = vtknp.numpy_to_vtk(
-                        strain[mode_name + ".dat"][:, 1:], deep=False
-                    )
-                    col_mode.SetName(mode_name)
-                    output.AddColumn(col_mode)
+            # Read time
+            col_time = vtknp.numpy_to_vtk(self.waveform_data.time, deep=False)
+            col_time.SetName("Time")
+            output.AddColumn(col_time)
+            # Read modes
+            for l, m in self.waveform_data.LM:
+                mode_name = f"Y_l{l}_m{m}"
+                logger.debug(f"Reading mode '{mode_name}'...")
+                mode_data = self.waveform_data[
+                    :, self.waveform_data.index(l, m)
+                ]
+                col_mode = vtknp.numpy_to_vtk(
+                    np.array([np.real(mode_data), np.imag(mode_data)]).T
+                )
+                col_mode.SetName(mode_name)
+                output.AddColumn(col_mode)
 
         logger.info(f"Waveform data loaded in {time.time() - start_time:.3f}s.")
 

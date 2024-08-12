@@ -68,3 +68,18 @@ def file_and_subfile(config):
         return path(config["File"]), config.get("Subfile", "/")
     else:
         raise ValueError(f"Can't parse as file and subfile: {config}")
+
+
+def sxs_location(config):
+    """Parse as configuration compatible with `sxs.load`.
+
+    The `sxs.load` function will handle downloading, caching, etc, so this
+    essentially superseded `parse_as.file_and_subfile`.
+    """
+    if isinstance(config, str):
+        return dict(location=config)
+    else:
+        return dict(
+            location=config.get("Location") or config.get("File"),
+            group=config.get("Group") or config.get("Subfile"),
+        )

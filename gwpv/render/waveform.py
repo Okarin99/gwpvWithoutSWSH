@@ -2,10 +2,10 @@ import logging
 from tempfile import NamedTemporaryFile
 
 import astropy.constants as const
-import h5py
 import matplotlib.animation as mpl_animation
 import matplotlib.pyplot as plt
 import numpy as np
+import sxs
 from matplotlib.image import imread
 
 from gwpv.progress import render_progress
@@ -47,23 +47,15 @@ def set_size(fig, size, dpi=100, eps=1e-2, give_up=2, min_size_px=10):
 def render_waveform(scene, output_file, time_merger, mass, bounds=None):
     logger = logging.getLogger(__name__)
 
-    waveform_file_and_subfile = parse_as.file_and_subfile(
-        scene["Datasources"]["Waveform"]
+    waveform_data = sxs.load(
+        **parse_as.sxs_location(scene["Datasources"]["Waveform"])
     )
-    logger.info(
-        "Rendering waveform from file '{}:{}'".format(
-            *waveform_file_and_subfile
-        )
+    waveform = np.real(waveform_data[:, waveform_data.index(2, 2)])
+    time = waveform_data.time
+    logger.debug(
+        f"Waveform has {len(waveform)} samples in time range [{time[0]},"
+        f" {time[-1]}]M"
     )
-    with h5py.File(waveform_file_and_subfile[0], "r") as h5_waveform_file:
-        waveform_data = h5_waveform_file[waveform_file_and_subfile[1]]
-        mode = "Y_l2_m2.dat"
-        waveform = np.array(waveform_data[mode][:, 1:])
-        time = np.array(waveform_data[mode][:, 0])
-        logger.debug(
-            f"Waveform has {len(waveform)} samples in time range [{time[0]},"
-            f" {time[-1]}]M"
-        )
 
     crop = np.array(
         scene["Animation"].get("Crop", [time[0], time[-1]]), dtype=np.float
@@ -94,8 +86,8 @@ def render_waveform(scene, output_file, time_merger, mass, bounds=None):
     dpi = 100
     fig = plt.figure(dpi=dpi, tight_layout=True)
     ax = plt.gca()
-    plt.plot(time, waveform[:, 0], color="white", lw=1, alpha=0.5)
-    (plot_active,) = plt.plot(time, waveform[:, 0], color="white", lw=1.5)
+    plt.plot(time, waveform, color="white", lw=1, alpha=0.5)
+    (plot_active,) = plt.plot(time, waveform, color="white", lw=1.5)
 
     time_annotation = plt.annotate(
         "",
@@ -139,7 +131,7 @@ def render_waveform(scene, output_file, time_merger, mass, bounds=None):
             if t_i >= t_now:
                 i_now = i
                 break
-        plot_active.set_data(time[: i_now + 1], waveform[: i_now + 1, 0])
+        plot_active.set_data(time[: i_now + 1], waveform[: i_now + 1])
         ax.lines = [ax.lines[0], ax.lines[1]]
         ax.axvline(t_now, color="white", alpha=0.3, lw=3)
         if t_now <= time_merger - 0.01:

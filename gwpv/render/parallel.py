@@ -3,7 +3,7 @@ import logging
 import multiprocessing
 from logging.handlers import QueueHandler
 
-import h5py
+import sxs
 
 from gwpv.progress import render_progress
 from gwpv.render.frames import render_frames
@@ -64,18 +64,15 @@ def render_parallel(
                 scene["Animation"]["Crop"][1] - scene["Animation"]["Crop"][0]
             )
         else:
-            waveform_file_and_subfile = parse_as.file_and_subfile(
-                scene["Datasources"]["Waveform"]
+            waveform = sxs.load(
+                **parse_as.sxs_location(scene["Datasources"]["Waveform"])
             )
-            with h5py.File(waveform_file_and_subfile[0], "r") as waveform_file:
-                waveform_times = waveform_file[waveform_file_and_subfile[1]][
-                    "Y_l2_m2.dat"
-                ][:, 0]
-                max_animation_length = waveform_times[-1] - waveform_times[0]
-                logger.debug(
-                    f"Inferred max. animation length {max_animation_length}M"
-                    " from waveform data."
-                )
+            waveform_times = waveform.time
+            max_animation_length = waveform_times[-1] - waveform_times[0]
+            logger.debug(
+                f"Inferred max. animation length {max_animation_length}M"
+                " from waveform data."
+            )
         frame_window = (
             0,
             animate.num_frames(
