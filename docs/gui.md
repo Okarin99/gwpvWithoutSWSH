@@ -11,7 +11,12 @@ With the GUI plugins you can explore waveform data in the ParaView application:
    the ParaView GUI, make sure the Python environment is activated as described
    in [Installation](installation). Then launch ParaView like this:
    ```sh
-   PV_PLUGIN_PATH=path/to/paraview_plugins path/to/paraview
+   export PV_PLUGIN_PATH=path/to/paraview_plugins
+   export PYTHONPATH=path/to/gwpv:path/to/env
+   # On Linux:
+   path/to/paraview
+   # On macOS:
+   open path/to/paraview.app
    ```
    You will now find the plugins provided by this repository in the ParaView GUI
    when you select 'Tools' > 'Manage Plugins'.
