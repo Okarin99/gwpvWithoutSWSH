@@ -12,6 +12,7 @@ from paraview.vtk.util import numpy_support as vtknp
 from vtkmodules.numpy_interface import dataset_adapter as dsa
 from vtkmodules.util.vtkAlgorithm import VTKPythonAlgorithmBase
 from vtkmodules.vtkCommonDataModel import vtkTable
+
 from gwpv.plugin_util.all_subfiles import all_subfiles
 
 logger = logging.getLogger(__name__)
