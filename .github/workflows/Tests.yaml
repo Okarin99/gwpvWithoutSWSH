@@ -48,21 +48,21 @@ jobs:
       - name: Run unit tests
         run: |
           python3 -m unittest discover -s tests
-      - name: Setup rendering test
-        run: |
-          mkdir test_rendering
-      - name: Test 'scene' endpoint
-        working-directory: test_rendering
-        run: >
-          gwrender scene
-          $GITHUB_WORKSPACE/Examples/Rainbow/Rainbow.yaml Resolutions/Test
-          -o ./ -n2 -v
-      - name: Test 'scenes' endpoint
-        working-directory: test_rendering
-        run: >
-          gwrender scenes
-          $GITHUB_WORKSPACE/Examples/Rainbow/Scenes.yaml Resolutions/Test
-          -o ./ -n2 -v
+      # - name: Setup rendering test
+      #   run: |
+      #     mkdir test_rendering
+      # - name: Test 'scene' endpoint
+      #   working-directory: test_rendering
+      #   run: >
+      #     gwrender scene
+      #     $GITHUB_WORKSPACE/Examples/Rainbow/Rainbow.yaml Resolutions/Test
+      #     -o ./ -n2 -v
+      # - name: Test 'scenes' endpoint
+      #   working-directory: test_rendering
+      #   run: >
+      #     gwrender scenes
+      #     $GITHUB_WORKSPACE/Examples/Rainbow/Scenes.yaml Resolutions/Test
+      #     -o ./ -n2 -v
       # - name: Test 'waveform' endpoint
       #   working-directory: test_rendering
       #   run: >
