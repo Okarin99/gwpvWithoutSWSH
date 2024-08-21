@@ -105,3 +105,6 @@ SpECTRE code by Oliver Long.
 
 - More images and citation: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13333571.svg)](https://doi.org/10.5281/zenodo.13333571)
 - Source: [nilsvu/bbh-capture-movie](https://github.com/nilsvu/bbh-capture-movie)
+- Video:
+
+  [![bbh-capture-video](http://img.youtube.com/vi/f4Lw5DIh6Gw/0.jpg)](http://www.youtube.com/watch?v=f4Lw5DIh6Gw)
