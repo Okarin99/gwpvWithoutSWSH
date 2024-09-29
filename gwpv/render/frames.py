@@ -608,7 +608,11 @@ def end_cue(self): pass
         pv.Render()
         pv.SaveScreenshot(os.path.join(frames_dir, "frame.png"))
         if interact:
-            pv.Interact()
+            #pv.ExportView(os.path.join(frames_dir, "frame.x3d"), ExportColorLegends=1)
+            #pv.ExportView(os.path.join(frames_dir, "frame.gltf"), InlineData=1
+            #pv.ExportView(os.path.join(frames_dir, "frame.vtkjs"))
+            #pv.ExportView(os.path.join(frames_dir, "frame.vtp"))
+            pv.Interact();
             cam = pv.GetActiveCamera()
             print("Camera settings after interact")
             print("Position:", cam.GetPosition())

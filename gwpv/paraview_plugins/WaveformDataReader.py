@@ -65,9 +65,7 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
         self._filename = value
         self.Modified()
 
-    @smproperty.stringvector(
-        name="Subfile", default_values=["Extrapolated_N2.dir"]
-    )
+    @smproperty.stringvector(name="Subfile")
     def SetSubfile(self, value):
         self._subfile = value
         self.Modified()
@@ -78,7 +76,7 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
         # Add the modes provided by the data file to the information that
         # propagates down the pipeline. This allows subsequent filters to select
         # a subset of modes to display, for example.
-        if self._filename is not None and self._subfile is not None:
+        if self._filename != "None" and self._subfile != "None":
             with h5py.File(self._filename, "r") as f:
                 self.mode_names = list(
                     map(
@@ -114,8 +112,8 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
         output = dsa.WrapDataObject(vtkTable.GetData(outInfo))
 
         if (
-            self._filename is not None
-            and self._subfile is not None
+            self._filename != "None"
+            and self._subfile != "None"
             and len(self.mode_names) > 0
         ):
             with h5py.File(self._filename, "r") as f:
