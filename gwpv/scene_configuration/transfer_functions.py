@@ -88,14 +88,8 @@ def configure_peaks_transfer_function(transfer_fctn, opacity_fctn, scalarBarTran
     apply_colormap(transfer_fctn, tf_config)
     apply_colormap(scalarBarTransfer_fctn, tf_config)
 
-    first_peak, opacity_first_peak = (
-        tf_config["FirstPeak"]["Position"],
-        tf_config["FirstPeak"]["Opacity"],
-    )
-    last_peak, opacity_last_peak = (
-        tf_config["LastPeak"]["Position"],
-        tf_config["LastPeak"]["Opacity"],
-    )
+    first_peak = tf_config["FirstPeak"]["Position"]
+    last_peak = tf_config["LastPeak"]["Position"]
     
     num_peaks = tf_config["NumPeaks"]
     if "Logarithmic" in tf_config and tf_config["Logarithmic"]:
@@ -112,13 +106,29 @@ def configure_peaks_transfer_function(transfer_fctn, opacity_fctn, scalarBarTran
         )
     tf_decay = list(np.diff(peaks) / 2)
     tf_decay.append(tf_decay[-1])
-    opacity_scale = (opacity_last_peak - opacity_first_peak) / (num_peaks - 1)
-    opacities = [opacity_first_peak + opacity_scale * i for i in range(0, len(peaks))]
 
     if "AddNegatives" in tf_config and tf_config["AddNegatives"]:
         peaks = [*[-d for d in peaks[::-1]], *peaks]
         tf_decay = [*[-d for d in tf_decay[::-1]], *tf_decay]
-        opacities = [*[d for d in opacities[::-1]], *opacities]
+    
+    if "CustomOpacities" in tf_config:
+        opacities = tf_config["CustomOpacities"]
+    else:
+        opacity_first_peak = tf_config["FirstPeak"]["Opacity"]
+        opacity_last_peak = tf_config["LastPeak"]["Opacity"]
+        if "PolynomialOpacities" in tf_config:
+            opacities = opacity_first_peak + (opacity_last_peak - opacity_first_peak) * pow(np.linspace(
+                0, 1, num_peaks
+            ), tf_config["PolynomialOpacities"])
+        else:
+            opacities = opacity_first_peak + (opacity_last_peak - opacity_first_peak) * np.linspace(
+                0, 1, num_peaks
+            )
+        
+        if "AddNegatives" in tf_config and tf_config["AddNegatives"]:
+            opacities = [*[d for d in opacities[::-1]], *opacities]
+
+    
 
     transfer_fctn.RescaleTransferFunction(peaks[0], peaks[-1])
     scalarBarTransfer_fctn.RescaleTransferFunction(peaks[0], peaks[-1])

@@ -326,35 +326,35 @@ def render_frames(
                         traj_obj_glyph = traj_obj_type(
                             **traj_obj_config[traj_obj_key]
                         )
-                    follow_traj.UpdatePipeline()
-                    traj_obj = pv.Glyph(
-                        Input=follow_traj, GlyphType=traj_obj_glyph
-                    )
-                    # Can't set this in the constructor for some reason
-                    traj_obj.ScaleFactor = 1.0
-                    for glyph_property in (
-                        traj_obj_config["Glyph"]
-                        if "Glyph" in traj_obj_config
-                        else []
-                    ):
-                        setattr(
-                            traj_obj,
-                            glyph_property,
-                            traj_obj_config["Glyph"][glyph_property],
+                        follow_traj.UpdatePipeline()
+                        traj_obj = pv.Glyph(
+                            Input=follow_traj, GlyphType=traj_obj_glyph
                         )
-                    traj_obj.UpdatePipeline()
-                    if "TimeShift" in traj_obj_config:
-                        traj_obj = animate.apply_time_shift(
-                            traj_obj, traj_obj_config["TimeShift"]
-                        )
-                    pv.Show(traj_obj, view, **traj_obj_config["Representation"])
-                    if "Visibility" in traj_obj_config:
-                        animate.apply_visibility(
-                            traj_obj,
-                            traj_obj_config["Visibility"],
-                            normalized_time_from_scene,
-                            scene_time_from_real,
-                        )
+                        # Can't set this in the constructor for some reason
+                        traj_obj.ScaleFactor = 1.0
+                        for glyph_property in (
+                            traj_obj_config["Glyph"]
+                            if "Glyph" in traj_obj_config
+                            else []
+                        ):
+                            setattr(
+                                traj_obj,
+                                glyph_property,
+                                traj_obj_config["Glyph"][glyph_property],
+                            )
+                        traj_obj.UpdatePipeline()
+                        if "TimeShift" in traj_obj_config:
+                            traj_obj = animate.apply_time_shift(
+                                traj_obj, traj_obj_config["TimeShift"]
+                            )
+                        pv.Show(traj_obj, view, **traj_obj_config["Representation"])
+                        if "Visibility" in traj_obj_config:
+                            animate.apply_visibility(
+                                traj_obj,
+                                traj_obj_config["Visibility"],
+                                normalized_time_from_scene,
+                                scene_time_from_real,
+                            )
             if "Tail" in trajectory_config:
                 with animate.restore_animation_state(animation):
                     traj_tail = TrajectoryTail(TrajectoryData=traj_data_reader)
