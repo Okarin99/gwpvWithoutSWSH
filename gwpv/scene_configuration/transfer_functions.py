@@ -128,10 +128,14 @@ def configure_peaks_transfer_function(transfer_fctn, opacity_fctn, scalarBarTran
         if "AddNegatives" in tf_config and tf_config["AddNegatives"]:
             opacities = [*[d for d in opacities[::-1]], *opacities]
 
-    
+    minColorPos = peaks[0]
+    maxColorPos = peaks[-1]
+    if "ColorRange" in tf_config:
+        minColorPos = tf_config["ColorRange"][0]
+        maxColorPos = tf_config["ColorRange"][1]
 
-    transfer_fctn.RescaleTransferFunction(peaks[0], peaks[-1])
-    scalarBarTransfer_fctn.RescaleTransferFunction(peaks[0], peaks[-1])
+    transfer_fctn.RescaleTransferFunction(minColorPos, maxColorPos)
+    scalarBarTransfer_fctn.RescaleTransferFunction(minColorPos, maxColorPos)
     set_opacity_function_points(
         opacity_fctn,
         [
@@ -161,9 +165,15 @@ def configure_custom_peaks_transfer_function(transfer_fctn, opacity_fctn, scalar
             inverse_peaks[i]["Position"] *= -1
         peaks = [*inverse_peaks, *peaks]
         tf_decay = [*[-d for d in tf_decay[::-1]], *tf_decay]
+    
+    minColorPos = peaks[0]
+    maxColorPos = peaks[-1]
+    if "ColorRange" in tf_config:
+        minColorPos = tf_config["ColorRange"][0]
+        maxColorPos = tf_config["ColorRange"][1]
 
-    transfer_fctn.RescaleTransferFunction(peaks[0]["Position"], peaks[-1]["Position"])
-    scalarBarTransfer_fctn.RescaleTransferFunction(peaks[0]["Position"], peaks[-1]["Position"])
+    transfer_fctn.RescaleTransferFunction(minColorPos, maxColorPos)
+    scalarBarTransfer_fctn.RescaleTransferFunction(minColorPos, maxColorPos)
     set_opacity_function_points(
         opacity_fctn,
         [
