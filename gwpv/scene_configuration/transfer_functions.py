@@ -1,6 +1,6 @@
 import numpy as np
 import copy
-from cmap import Colormap
+import matplotlib.colors
 
 def polynomalTransform(transfer_fctn, degree, shift):
     for i in range(0, len(transfer_fctn.RGBPoints), 4):
@@ -40,9 +40,8 @@ def set_categories(scalarBarTransfer_fctn, rgb_points, classes):
     minpos = rgb_points[0]
     maxpos = rgb_points[-4]
     span = maxpos - minpos
-    classmap = Colormap([[(rgb_points[i]-minpos)/span, *rgb_points[i+1:i+4], 1.0] for i in range(0, len(rgb_points), 4)])
-    classmap
-    mappedvalues = classmap([(c-minpos)/span for c in classes]).flatten()
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", [((rgb_points[i]-minpos)/span, (*rgb_points[i+1:i+4], 1.0)) for i in range(0, len(rgb_points), 4)])
+    mappedvalues = cmap([(c-minpos)/span for c in classes]).flatten()
     scalarBarTransfer_fctn.IndexedColors = np.delete(mappedvalues, np.arange(0, len(mappedvalues), 4) + 3)
 
 
