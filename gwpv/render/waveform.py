@@ -1,7 +1,6 @@
 import logging
 from tempfile import NamedTemporaryFile
 
-import astropy.constants as const
 import h5py
 import matplotlib.animation as mpl_animation
 import matplotlib.pyplot as plt
@@ -76,6 +75,7 @@ def render_waveform(scene, output_file, time_merger, mass, bounds=None):
         bounds = np.asarray(bounds)
 
     if time_merger is not None and mass is not None:
+        import astropy.constants as const
         # Transform time to seconds
         M_in_s = (const.G / const.c**3 * const.M_sun * mass).value
         time *= M_in_s
