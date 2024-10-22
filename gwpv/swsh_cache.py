@@ -111,6 +111,7 @@ def cached_swsh_grid(
                     os.makedirs(cache_dir)
 
                 np.save(r_grid_cache_file, r)
+                swsh_grid.flush()
                 logger.debug(
                     "SWSH grid cache saved to file"
                     f" '{swsh_grid_cache_file}'."
