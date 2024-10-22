@@ -6,6 +6,8 @@ import time
 import numpy as np
 import rich.progress
 
+from pathlib import Path
+
 from gwpv.scene_configuration import parse_as
 
 def smoothstep(x):
@@ -44,6 +46,8 @@ def cached_swsh_grid(
 
     swsh_grid = None
     if cache_dir:
+        Path(cache_dir).mkdir(parents=True, exist_ok=True)
+
         swsh_grid_id = (
             round(float(size), 3),
             int(num_points),
