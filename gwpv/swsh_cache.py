@@ -8,14 +8,29 @@ import rich.progress
 
 from gwpv.scene_configuration import parse_as
 
+def smoothstep(x):
+    return np.where(x < 0, 0, np.where(x <= 1, 3 * x**2 - 2 * x**3, 1))
+
+
+def activation(x, width):
+    return smoothstep(x / width)
+
+
+def deactivation(x, width, outer):
+    return smoothstep((outer - x) / width)
 
 def cached_swsh_grid(
     size,
     num_points,
     spin_weight,
     ell_max,
+    radial_scale,
     clip_y_normal,
     clip_z_normal,
+    activation_offset,
+    activation_width,
+    deactivation_width,
+    add_one_over_r_scaling,
     cache_dir=None,
 ):
     logger = logging.getLogger(__name__)
@@ -26,6 +41,7 @@ def cached_swsh_grid(
         lambda arr: arr.flatten(order="F"), np.meshgrid(X, Y, Z, indexing="ij")
     )
     r = np.sqrt(x**2 + y**2 + z**2)
+
     swsh_grid = None
     if cache_dir:
         swsh_grid_id = (
@@ -33,8 +49,13 @@ def cached_swsh_grid(
             int(num_points),
             int(spin_weight),
             int(ell_max),
+            round(float(radial_scale), 3),
             bool(clip_y_normal),
             bool(clip_z_normal),
+            round(float(activation_offset), 3),
+            round(float(activation_width), 3),
+            round(float(deactivation_width), 3),
+            bool(add_one_over_r_scaling)
         )
         # Create a somewhat unique filename
         swsh_grid_hash = (
@@ -45,44 +66,63 @@ def cached_swsh_grid(
             cache_dir,
             f"swsh_grid_D{int(size)}_N{int(num_points)}_{str(swsh_grid_hash)}.npy",
         )
-        if os.path.exists(swsh_grid_cache_file):
-            logger.debug(
-                f"Loading SWSH grid from file '{swsh_grid_cache_file}'..."
-            )
-            swsh_grid = np.load(swsh_grid_cache_file)
-        else:
-            logger.debug(f"No SWSH grid file '{swsh_grid_cache_file}' found.")
-    if swsh_grid is None:
-        logger.info("No cached SWSH grid found, computing now...")
-        logger.info("Loading 'spherical' module...")
-        import quaternionic
-        import spherical
+        r_grid_cache_file = os.path.join(
+            cache_dir,
+            f"r_grid_D{int(size)}_N{int(num_points)}_{str(swsh_grid_hash)}.npy",
+        )
 
-        logger.info("'spherical' module loaded.")
-        with rich.progress.Progress(
-            rich.progress.TextColumn(
-                "[progress.description]{task.description}"
-            ),
-            rich.progress.SpinnerColumn(
-                spinner_name="simpleDots", finished_text="... done."
-            ),
-            rich.progress.TimeElapsedColumn(),
-        ) as progress:
-            task_id = progress.add_task("Computing SWSH grid", total=1)
-            th = np.arccos(z / r)
-            phi = np.arctan2(y, x)
-            angles = quaternionic.array.from_spherical_coordinates(th, phi)
-            swsh_grid = spherical.Wigner(ell_max).sYlm(s=spin_weight, R=angles)
-            if cache_dir:
+        if not os.path.exists(swsh_grid_cache_file) or not os.path.exists(r_grid_cache_file):
+            logger.debug(f"No SWSH grid file '{swsh_grid_cache_file}' found.")
+            logger.info("No cached SWSH grid found, computing now...")
+            logger.info("Loading 'spherical' module...")
+            import quaternionic
+            import spherical
+
+            logger.info("'spherical' module loaded.")
+            with rich.progress.Progress(
+                rich.progress.TextColumn(
+                    "[progress.description]{task.description}"
+                ),
+                rich.progress.SpinnerColumn(
+                    spinner_name="simpleDots", finished_text="... done."
+                ),
+                rich.progress.TimeElapsedColumn(),
+            ) as progress:
+                task_id = progress.add_task("Computing SWSH grid", total=1)
+                th = np.arccos(z / r)
+                phi = np.arctan2(y, x)
+                angles = quaternionic.array.from_spherical_coordinates(th, phi)
+                swsh_grid = np.memmap(swsh_grid_cache_file, dtype=np.complex128, mode='w+', shape=(len(r), (ell_max+1)**2))
+                spherical.Wigner(ell_max).sYlm(s=spin_weight, R=angles, out=swsh_grid)
+
+                screen = activation(
+                    r - activation_offset, activation_width
+                ) * deactivation(r, deactivation_width, size)
+
+                swsh_grid *= screen.reshape(screen.shape + (1,))
+
+                # Apply radial scale
+                r *= radial_scale
+                
+                if add_one_over_r_scaling:
+                    swsh_grid /= (r + 1.0e-30).reshape(r.shape + (1,))
+
                 if not os.path.exists(cache_dir):
                     os.makedirs(cache_dir)
-                if not os.path.exists(swsh_grid_cache_file):
-                    np.save(swsh_grid_cache_file, swsh_grid)
-                    logger.debug(
-                        "SWSH grid cache saved to file"
-                        f" '{swsh_grid_cache_file}'."
-                    )
-            progress.update(task_id, completed=1)
+
+                np.save(r_grid_cache_file, r)
+                logger.debug(
+                    "SWSH grid cache saved to file"
+                    f" '{swsh_grid_cache_file}'."
+                )
+                progress.update(task_id, completed=1)
+        
+        logger.debug(
+            f"Loading SWSH grid from file '{swsh_grid_cache_file}'..."
+        )
+        swsh_grid = np.memmap(swsh_grid_cache_file, dtype=np.complex128, mode='r', shape=(len(r), (ell_max+1)**2))
+        r = np.load(r_grid_cache_file)
+
     return swsh_grid, r
 
 
@@ -99,5 +139,10 @@ def precompute_cached_swsh_grid(scene):
         ell_max=config.get("EllMax", 2),
         clip_y_normal=config.get("ClipYNormal", False),
         clip_z_normal=config.get("ClipZNormal", False),
+        radial_scale=config.get("RadialScale", 10),
+        activation_offset=config.get("ActivationOffset", 10),
+        activation_width=config.get("ActivationWidth", 10),
+        deactivation_width=config.get("DeactivationWidth", 10),
+        add_one_over_r_scaling=config.get("OneOverRScaling", False),
         cache_dir=parse_as.path(scene["Datasources"]["SwshCache"]),
     )

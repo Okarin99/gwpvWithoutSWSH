@@ -32,19 +32,6 @@ def get_mode_name(l, abs_m):
 def LM_index(ell, m, ell_min):
     return ell * (ell + 1) - ell_min**2 + m
 
-
-def smoothstep(x):
-    return np.where(x < 0, 0, np.where(x <= 1, 3 * x**2 - 2 * x**3, 1))
-
-
-def activation(x, width):
-    return smoothstep(x / width)
-
-
-def deactivation(x, width, outer):
-    return smoothstep((outer - x) / width)
-
-
 # Caching
 # When using SwshGrid input this is not necessary anymore
 # These are global variables because setting them on the filter object appears
@@ -81,15 +68,6 @@ def cached_swsh_grid(
         swsh_grid, r = swsh_cache.cached_swsh_grid(
             size=size, **swsh_grid_kwargs
         )
-        # Apply screening
-        screen = activation(
-            r - activation_offset, activation_width
-        ) * deactivation(r, deactivation_width, size)
-        swsh_grid *= screen.reshape(screen.shape + (1,))
-        # Apply radial scale
-        r *= radial_scale
-        if add_one_over_r_scaling:
-            swsh_grid /= (r + 1.0e-30).reshape(r.shape + (1,))
         # Cache and return
         _cached_swsh_grid = swsh_grid
         _cached_r = r
@@ -324,7 +302,7 @@ class WaveformToVolume(VTKPythonAlgorithmBase):
         # This section can be deleted when using SwshGrid input
         spin_weight = -2
         ell_max = self.ell_max
-        swsh_grid, r = cached_swsh_grid(
+        swsh_grid, r = swsh_cache.cached_swsh_grid(
             size=D,
             num_points=N,
             spin_weight=self.spin_weight,
