@@ -5,7 +5,3 @@ Animation:
 View:
   Replace:
     ViewSize: [1920, 1080] # 1080p
-
-WaveformToVolume:
-  Replace:
-    SpatialResolution: 150

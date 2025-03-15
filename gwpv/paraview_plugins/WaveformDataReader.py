@@ -2,16 +2,34 @@
 
 import logging
 import time
+import bisect
 
 import h5py
+import numpy as np
+
 from paraview.util.vtkAlgorithm import smdomain, smhint, smproperty, smproxy
 from paraview.vtk.util import keys as vtkkeys
 from paraview.vtk.util import numpy_support as vtknp
+from paraview import util
+
 from vtkmodules.numpy_interface import dataset_adapter as dsa
 from vtkmodules.util.vtkAlgorithm import VTKPythonAlgorithmBase
-from vtkmodules.vtkCommonDataModel import vtkTable
+from vtkmodules.vtkCommonCore import vtkDataArraySelection
+from vtkmodules.vtkCommonDataModel import vtkUniformGrid
+
+import gwpv.plugin_util.data_array_selection as das_util
+import gwpv.plugin_util.timesteps as timesteps_util
+
 
 logger = logging.getLogger(__name__)
+
+def find_index_left(a, x):
+    i = bisect.bisect_right(a, x)
+    if i >= len(a):
+        i = len(a) - 1
+    elif i:
+        i = i - 1
+    return i
 
 
 @smproxy.reader(
@@ -21,42 +39,21 @@ logger = logging.getLogger(__name__)
     file_description="HDF5 files",
 )
 class WaveformDataReader(VTKPythonAlgorithmBase):
-    """Read waveform data from an HDF5 file.
-
-    This plugin currently assumes the data in the 'Subfile' is stored in the
-    SpEC waveform file format. It is documented in Appendix A.3.1 in the 2019
-    SXS catalog paper (https://arxiv.org/abs/1904.04831). Specifically:
-
-    - Each mode is stored in a dataset named 'Y_l{l}_m{m}.dat'. So the structure
-      of the HDF5 file is:
-
-        {FileName}/{Subfile}/Y_l{l}_m{m}.dat
-
-      The subfile should contain at least the (2,2) mode (named Y_l2_m2.dat).
-    - For a typical SpEC simulation you would read the modes from the
-      'rhOverM_Asymptotic_GeometricUnits_CoM.h5' file and the
-      'Extrapolated_N2.dir' subfile.
-    - Each 'Y_l{l}_m{m}.dat' dataset has three columns:
-
-        1. Time
-        2. r * Re(h_lm)
-        3. r * Im(h_lm)
-
-      The 'Time' column should be the same for all datasets. It will only be
-      read from the (2,2) mode dataset.
-    """
-
-    WAVEFORM_MODES_KEY = vtkkeys.MakeKey(
-        vtkkeys.StringVectorKey, "WAVEFORM_MODES", "WaveformDataReader"
-    )
+    """Read waveform data from an HDF5 file."""
 
     def __init__(self):
         VTKPythonAlgorithmBase.__init__(
-            self, nInputPorts=0, nOutputPorts=1, outputType="vtkTable"
+            self, nInputPorts=0, nOutputPorts=1, outputType="vtkUniformGrid"
         )
         self._filename = None
         self._subfile = None
-        self.mode_names = []
+
+        self.polarizations_selection = vtkDataArraySelection()
+        self.polarizations_selection.AddArray("Plus")
+        self.polarizations_selection.AddArray("Cross")
+        self.polarizations_selection.AddObserver(
+            "ModifiedEvent", das_util.create_modified_callback(self)
+        )
 
     @smproperty.stringvector(name="FileName")
     @smdomain.filelist()
@@ -69,6 +66,18 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
     def SetSubfile(self, value):
         self._subfile = value
         self.Modified()
+    
+    @smproperty.dataarrayselection(name="Polarizations")
+    def GetPolarizations(self):
+        return self.polarizations_selection
+    
+    @smproperty.doublevector(
+        name="TimestepValues",
+        information_only="1",
+        si_class="vtkSITimeStepsProperty",
+    )
+    def GetTimestepValues(self):
+        return self._get_timesteps().tolist()
 
     def RequestInformation(self, request, inInfo, outInfo):
         logger.debug("Requesting information...")
@@ -78,30 +87,9 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
         # a subset of modes to display, for example.
         if self._filename != "None" and self._subfile != "None":
             with h5py.File(self._filename, "r") as f:
-                self.mode_names = list(
-                    map(
-                        lambda dataset_name: dataset_name.replace(".dat", ""),
-                        filter(
-                            lambda dataset_name: dataset_name.startswith("Y_"),
-                            f[self._subfile].keys(),
-                        ),
-                    )
-                )
-            if len(self.mode_names) == 0:
-                logger.warning(
-                    "No waveform mode datasets (prefixed 'Y_') found in file"
-                    f" '{self._filename}:{self._subfile}'."
-                )
-            logger.debug("Set MODE_ARRAYS: {}".format(self.mode_names))
-            info.Remove(WaveformDataReader.WAVEFORM_MODES_KEY)
-            for mode_name in self.mode_names:
-                info.Append(WaveformDataReader.WAVEFORM_MODES_KEY, mode_name)
-            # Make the `WAVEFORM_MODES` propagate downstream.
-            # TODO: This doesn't seem to be working...
-            request.AppendUnique(
-                self.GetExecutive().KEYS_TO_COPY(),
-                WaveformDataReader.WAVEFORM_MODES_KEY,
-            )
+                dataset = f[self._subfile]
+                grid_extents = [0, dataset.attrs["dim_x"]-1, 0, dataset.attrs["dim_y"]-1, 0, dataset.attrs["dim_z"]-1]
+                util.SetOutputWholeExtent(self, grid_extents)
         logger.debug(f"Information object: {info}")
         return 1
 
@@ -109,27 +97,42 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
         logger.info("Loading waveform data...")
         start_time = time.time()
 
-        output = dsa.WrapDataObject(vtkTable.GetData(outInfo))
-
         if (
             self._filename != "None"
             and self._subfile != "None"
-            and len(self.mode_names) > 0
         ):
-            with h5py.File(self._filename, "r") as f:
-                strain = f[self._subfile]
-                t = strain["Y_l2_m2.dat"][:, 0]
-                col_time = vtknp.numpy_to_vtk(t, deep=False)
-                col_time.SetName("Time")
-                output.AddColumn(col_time)
+            info = outInfo.GetInformationObject(0)
 
-                for mode_name in self.mode_names:
-                    logger.debug(f"Reading mode '{mode_name}'...")
-                    col_mode = vtknp.numpy_to_vtk(
-                        strain[mode_name + ".dat"][:, 1:], deep=False
-                    )
-                    col_mode.SetName(mode_name)
-                    output.AddColumn(col_mode)
+            polarizations = [("Plus", 0), ("Cross", 1)]
+            t = timesteps_util.get_timestep(self, logger=logger)
+
+            with h5py.File(self._filename, "r") as f:
+                subfile = f[self._subfile]
+
+                timesteps = subfile["timesteps.dat"]
+                t_index = find_index_left(timesteps, t)
+
+                output = dsa.WrapDataObject(vtkUniformGrid.GetData(outInfo))
+
+                output.SetDimensions(subfile.attrs["dim_x"], subfile.attrs["dim_y"], subfile.attrs["dim_z"])
+                output.SetOrigin(subfile.attrs["origin_x"], subfile.attrs["origin_y"], subfile.attrs["origin_y"])
+                output.SetSpacing(subfile.attrs["spacing_x"], subfile.attrs["spacing_y"], subfile.attrs["spacing_z"])
+
+                for (polarization, pol_index) in polarizations:
+                    if self.polarizations_selection.ArrayIsEnabled(polarization):
+                        strain_over_time = subfile["strain"]
+
+                        if t <= timesteps[0]:
+                            strain = strain_over_time["1.dat"][:, pol_index]
+                        elif t >= timesteps[-1]:
+                            strain = strain_over_time[str(len(timesteps)) + ".dat"][:, pol_index]
+                        else:
+                            t_interp = (t - timesteps[t_index]) / (timesteps[t_index + 1] - timesteps[t_index])
+                            strain = (1-t_interp)*strain_over_time[str(t_index+1) + ".dat"][:, pol_index] + t_interp*strain_over_time[str(t_index+2) + ".dat"][:, pol_index]
+
+                        strain_vtk = vtknp.numpy_to_vtk(strain, deep=True)
+                        strain_vtk.SetName(polarization + " strain")
+                        output.GetPointData().AddArray(strain_vtk)
 
         logger.info(f"Waveform data loaded in {time.time() - start_time:.3f}s.")
 

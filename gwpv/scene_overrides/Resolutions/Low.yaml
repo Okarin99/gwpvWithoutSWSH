@@ -7,7 +7,3 @@ Animation:
 View:
   Replace:
     ViewSize: [1280, 720] # 720p
-
-WaveformToVolume:
-  Replace:
-    SpatialResolution: 50

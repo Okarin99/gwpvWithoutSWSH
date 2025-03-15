@@ -1,8 +1,3 @@
 View:
   Replace:
     ViewSize: [4096, 2160] # 4k
-
-WaveformToVolume:
-  Replace:
-    SpatialResolution: 500
-    KeepEveryNthTimestep: 1

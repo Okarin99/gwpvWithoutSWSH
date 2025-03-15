@@ -43,38 +43,6 @@ def apply_defaults(scene):
     if "Animation" not in scene:
         scene["Animation"] = {}
     animation_config = scene["Animation"]
-    # Crop time to full propagation through domain
-    if (
-        "FreezeTime" not in animation_config
-        and "Crop" not in animation_config
-        and "Size" in scene["WaveformToVolume"]
-        and "RadialScale" in scene["WaveformToVolume"]
-    ):
-        waveform_file_and_subfile = parse_as.file_and_subfile(
-            scene["Datasources"]["Waveform"]
-        )
-        with h5py.File(waveform_file_and_subfile[0], "r") as waveform_file:
-            waveform_data = waveform_file[waveform_file_and_subfile[1]]
-            mode_data = waveform_data["Y_l2_m2.dat"]
-            t0, t1 = mode_data[0, 0], mode_data[-1, 0]
-        domain_radius = (
-            scene["WaveformToVolume"]["Size"]
-            * scene["WaveformToVolume"]["RadialScale"]
-        )
-        animation_config["Crop"] = (t0 + domain_radius, t1 + domain_radius)
-        report_default("Animation.Crop", animation_config["Crop"])
-
-    # CameraShots
-    if "CameraShots" not in scene:
-        camera_distance = 2 * scene["WaveformToVolume"]["Size"]
-        scene["CameraShots"] = [
-            {
-                "Position": [-camera_distance, 0.0, 0.0],
-                "ViewUp": [0.0, 0.0, 1.0],
-                "FocalPoint": [0.0, 0.0, 0.0],
-                "ViewAngle": 60.0,
-            }
-        ]
 
     if "Horizons" in scene["Datasources"] and "Horizons" not in scene:
         scene["Horizons"] = []

@@ -63,7 +63,6 @@ def render_scene_entrypoint(
 ):
     from gwpv.download_data import download_data
     from gwpv.scene_configuration.load import load_scene
-    from gwpv.swsh_cache import precompute_cached_swsh_grid
 
     # Validate options
     assert (
@@ -82,9 +81,6 @@ def render_scene_entrypoint(
 
     # Download data files
     download_data(scene["Datasources"])
-
-    # Cache SWSH grid
-    precompute_cached_swsh_grid(scene)
 
     if num_jobs == 1:
         from gwpv.progress import render_progress
@@ -206,19 +202,6 @@ def render_scenes_entrypoint(
                 + common_args,
             )
 
-
-def render_waveform_entrypoint(
-    scene_files, keypath_overrides, scene_paths, **kwargs
-):
-    from gwpv.download_data import download_data
-    from gwpv.render.waveform import render_waveform
-    from gwpv.scene_configuration.load import load_scene
-
-    scene = load_scene(scene_files, keypath_overrides, paths=scene_paths)
-    download_data(scene["Datasources"])
-    render_waveform(scene, **kwargs)
-
-
 def main():
     import argparse
 
@@ -317,26 +300,8 @@ def main():
         )
         subparser.add_argument("--activate-venv")
 
-    # `waveform` CLI
-    parser_waveform = subparsers.add_parser(
-        "waveform", help="Render waveform for a scene."
-    )
-    parser_waveform.set_defaults(subcommand=render_waveform_entrypoint)
-    parser_waveform.add_argument(
-        "scene_files",
-        help=(
-            "Path to one or more YAML scene configuration files. Entries in"
-            " later files override those in earlier files."
-        ),
-        nargs="+",
-    )
-    parser_waveform.add_argument("--output-file", "-o", required=True)
-    parser_waveform.add_argument("--time-merger", type=float, required=False)
-    parser_waveform.add_argument("--mass", type=float, required=False)
-    parser_waveform.add_argument("--bounds", type=float, nargs=2)
-
     # Common CLI for all entrypoints
-    for subparser in [parser_scene, parser_scenes, parser_waveform]:
+    for subparser in [parser_scene, parser_scenes]:
         subparser.add_argument(
             "--scene-path",
             "-p",

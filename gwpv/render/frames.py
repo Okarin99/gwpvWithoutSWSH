@@ -36,7 +36,6 @@ logger.info("Loading ParaView plugins...")
 plugins_dir = files("gwpv.paraview_plugins")
 load_plugins = [
     "WaveformDataReader.py",
-    "WaveformToVolume.py",
     "TrajectoryDataReader.py",
     "FollowTrajectory.py",
     "TrajectoryTail.py",
@@ -122,13 +121,10 @@ def render_frames(
             ]
     waveform_to_volume_objects = []
     for waveform_to_volume_config in waveform_to_volume_configs:
-        volume_data = WaveformToVolume(
-            WaveformData=waveform_data,
-            SwshCacheDirectory=parse_as.path(scene["Datasources"]["SwshCache"]),
-            **waveform_to_volume_config["Object"],
+        volume_data = WaveformDataReader(
+            FileName=waveform_h5file, Subfile=waveform_subfile,
+            **waveform_to_volume_config["Object"]
         )
-        if "Modes" in waveform_to_volume_config["Object"]:
-            volume_data.Modes = waveform_to_volume_config["Object"]["Modes"]
 
         if "Polarizations" in waveform_to_volume_config["Object"]:
             volume_data.Polarizations = waveform_to_volume_config["Object"][
@@ -137,11 +133,6 @@ def render_frames(
         waveform_to_volume_objects.append(volume_data)
 
     # Compute timing and frames information
-    time_range_in_M = (
-        volume_data.TimestepValues[0],
-        volume_data.TimestepValues[-1],
-    )
-    logger.debug(f"Full available data time range: {time_range_in_M} (in M)")
     interact = False
     if "FreezeTime" in scene["Animation"]:
         frozen_time = scene["Animation"]["FreezeTime"]
@@ -156,9 +147,7 @@ def render_frames(
         yield dict(total=1)
         yield dict(start=True)
     else:
-        if "Crop" in scene["Animation"]:
-            time_range_in_M = scene["Animation"]["Crop"]
-            logger.debug(f"Cropping time range to {time_range_in_M} (in M).")
+        time_range_in_M = scene["Animation"]["Crop"]
         animation_speed = scene["Animation"]["Speed"]
         frame_rate = scene["Animation"]["FrameRate"]
         num_frames = animate.num_frames(

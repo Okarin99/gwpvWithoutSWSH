@@ -1,7 +1,0 @@
-Base:
-  - Rainbow
-  - Resolutions/Medium
-
-Animation:
-  Replace:
-    FreezeTime: 2192
