@@ -47,6 +47,12 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
         )
         self._filename = None
         self._subfile = None
+        self._origin_x = None
+        self._origin_y = None
+        self._origin_z = None
+        self._size_x = None
+        self._size_y = None
+        self._size_z = None
 
         self.polarizations_selection = vtkDataArraySelection()
         self.polarizations_selection.AddArray("Plus")
@@ -65,6 +71,36 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
     @smproperty.stringvector(name="Subfile")
     def SetSubfile(self, value):
         self._subfile = value
+        self.Modified()
+
+    @smproperty.doublevector(name="OriginX", default_values=-9999999999999)
+    def SetOriginX(self, value):
+        self._origin_x = value
+        self.Modified()
+    
+    @smproperty.doublevector(name="OriginY", default_values=-9999999999999)
+    def SetOriginY(self, value):
+        self._origin_y = value
+        self.Modified()
+    
+    @smproperty.doublevector(name="OriginZ", default_values=-9999999999999)
+    def SetOriginZ(self, value):
+        self._origin_z = value
+        self.Modified()
+    
+    @smproperty.doublevector(name="SizeX", default_values=-9999999999999)
+    def SetSizeX(self, value):
+        self._size_x = value
+        self.Modified()
+    
+    @smproperty.doublevector(name="SizeY", default_values=-9999999999999)
+    def SetSizeY(self, value):
+        self._size_y = value
+        self.Modified()
+    
+    @smproperty.doublevector(name="SizeZ", default_values=-9999999999999)
+    def SetSizeZ(self, value):
+        self._size_z = value
         self.Modified()
     
     @smproperty.dataarrayselection(name="Polarizations")
@@ -114,9 +150,25 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
 
                 output = dsa.WrapDataObject(vtkUniformGrid.GetData(outInfo))
 
-                output.SetDimensions(subfile.attrs["dim_x"], subfile.attrs["dim_y"], subfile.attrs["dim_z"])
-                output.SetOrigin(subfile.attrs["origin_x"], subfile.attrs["origin_y"], subfile.attrs["origin_y"])
-                output.SetSpacing(subfile.attrs["spacing_x"], subfile.attrs["spacing_y"], subfile.attrs["spacing_z"])
+                ox = self._origin_x if self._origin_x != -9999999999999 else subfile.attrs["origin_x"]
+                oy = self._origin_y if self._origin_y != -9999999999999 else subfile.attrs["origin_y"]
+                oz = self._origin_z if self._origin_z != -9999999999999 else subfile.attrs["origin_z"]
+
+                sizex = self._size_x if self._size_x != -9999999999999 else subfile.attrs["size_x"]
+                sizey = self._size_y if self._size_y != -9999999999999 else subfile.attrs["size_y"]
+                sizez = self._size_z if self._size_z != -9999999999999 else subfile.attrs["size_z"]
+
+                dimx = subfile.attrs["dim_x"]
+                dimy = subfile.attrs["dim_y"]
+                dimz = subfile.attrs["dim_z"]
+
+                spacingx = sizex / (dimx - 1)
+                spacingy = sizey / (dimy - 1)
+                spacingz = sizez / (dimz - 1)
+
+                output.SetDimensions(dimx, dimy, dimz)
+                output.SetOrigin(ox, oy, oz)
+                output.SetSpacing(spacingx, spacingy, spacingz)
 
                 for (polarization, pol_index) in polarizations:
                     if self.polarizations_selection.ArrayIsEnabled(polarization):
