@@ -112,6 +112,19 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
         information_only="1",
         si_class="vtkSITimeStepsProperty",
     )
+
+    def _get_timesteps(self):
+        logger.debug("Getting time range from data...")
+        if self._filename != "None" and self._subfile != "None":
+            with h5py.File(self._filename, "r") as f:
+                subfile = f[self._subfile]
+                timesteps = subfile["timesteps.dat"]
+                # Using a few timesteps within the data range so we can animate through
+                # them in the GUI
+                return np.array(timesteps[:])
+        else:
+            return []
+
     def GetTimestepValues(self):
         return self._get_timesteps().tolist()
 
@@ -126,6 +139,14 @@ class WaveformDataReader(VTKPythonAlgorithmBase):
                 dataset = f[self._subfile]
                 grid_extents = [0, dataset.attrs["dim_x"]-1, 0, dataset.attrs["dim_y"]-1, 0, dataset.attrs["dim_z"]-1]
                 util.SetOutputWholeExtent(self, grid_extents)
+        
+        # This needs the time data from the waveform file, so we may have to
+        # set the `TIME_RANGE` and `TIME_STEPS` already in the
+        # WaveformDataReader.
+        timesteps = self._get_timesteps()
+        if len(timesteps) != 0:
+            timesteps_util.set_timesteps(self, self._get_timesteps(), logger=logger)
+
         logger.debug(f"Information object: {info}")
         return 1
 
